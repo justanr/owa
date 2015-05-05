@@ -4,10 +4,14 @@
 
     Internal utilities for OpenWebAmp
 """
+from flask import request
 from marshmallow.fields import Field
-from flask import jsonify, request
-from flask.ext.restful import Resource
-from werkzeug.wrappers import Response as ResponseBase
+
+
+def get_page_and_limit(request=request):
+    page = request.args.get('page', default=1, type=int)
+    limit = request.args.get('limit', default=10, type=int)
+    return page, limit
 
 
 def _unique(session, cls, hashfunc, queryfunc, constructor, *args, **kwargs):
@@ -27,15 +31,16 @@ def _unique(session, cls, hashfunc, queryfunc, constructor, *args, **kwargs):
     Source:
     https://bitbucket.org/zzzeek/sqlalchemy/wiki/UsageRecipes/UniqueObject
     """
-    cache = getattr(session, '_unique_cache', {})
+    cache = getattr(session, '_unique_cache', None)
 
-    if not cache:
-        session._unique_cache = cache
+    if cache is None:
+        session._unique_cache = cache = {}
 
     key = (cls, hashfunc(*args, **kwargs))
 
     if key in cache:
         return cache[key]
+
     else:
         with session.no_autoflush:
             obj = queryfunc(session.query(cls), *args, **kwargs).first()
@@ -122,39 +127,3 @@ def _seconds_to_human(seconds, units=_time_units):
 class Length(Field):
     def _serialize(self, value, attr, obj):
         return _seconds_to_human(value)
-
-
-class OWAResource(Resource):
-    schema = None
-    schema_opts = {}
-    routes = []
-    route_opts = {}
-
-    @classmethod
-    def register(cls, api):
-        api.add_resource(cls, *cls.routes, **cls.route_opts)
-
-    def dispatch_request(self, *args, **kwargs):
-        """OWA only deals with JSON and uses Marshmallow to do so.
-        Instead of adding jsonsify(cls.scheme(data, **cls.schema_opts).data)
-        to every route by hand, the behavior is simply encoded here.
-        """
-        # Taken from Flask and Flask-Restful
-        meth = getattr(self, request.method.lower(), None)
-        if meth is None and request.method == 'HEAD':
-            meth = getattr(self, 'get', None)
-        assert meth is not None, \
-            'Unimplemented method {!r}'.format(request.method)
-
-        for decorator in self.method_decorators:
-            meth = decorator(meth)
-
-        resp = meth(*args, **kwargs)
-
-        if isinstance(resp, ResponseBase):
-            return resp
-
-        if self.schema:
-            return jsonify(self.schema.dump(resp).data)
-        else:
-            return jsonify(resp)

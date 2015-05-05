@@ -10,13 +10,20 @@ from owa import (
     config,
 
     # modules
-    models,
+    schemas, models, utils, core, shell,
 
     # helpers
-    create_app,
+    create_app, after_request
 )
 
-app = create_app('owa', config=config.DevConfig, exts=[db])
+from owa.api import api
+
+import pynads
+
+app = create_app('owa',
+                 config=config.DevConfig,
+                 exts=[db, api],
+                 after=after_request)
 manager = Manager(app)
 migrate = Migrate(app, db)
 
@@ -25,7 +32,9 @@ manager.add_command('db', MigrateCommand)
 
 @manager.shell
 def _shell_context():
-    return dict(app=app, db=db, models=models)
+    return dict(app=app, db=db, models=models,
+                utils=utils, core=core, pynads=pynads,
+                schemas=schemas, shell=shell)
 
 if __name__ == '__main__':
     manager.run()

@@ -5,7 +5,6 @@ basedir = path.abspath(path.dirname(__file__))
 
 
 class BaseConfig(object):
-    SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     SQLALCHEMY_RECORD_QUERIES = False
 
 

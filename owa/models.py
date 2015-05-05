@@ -15,54 +15,102 @@
 """
 from uuid import uuid4
 from flask.ext.sqlalchemy import SQLAlchemy
+from pynads import List, Right, Left
+from pynads.utils.decorators import annotate
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.orderinglist import ordering_list
+from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from .utils import ReprMixin, UniqueMixin
+from .core import break_tag
 
 db = SQLAlchemy()
 
 
-class Artist(db.Model, ReprMixin, UniqueMixin):
-    __tablename__ = 'artists'
-    repr_fields = ('name',)
+class BaseModel(ReprMixin):
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower() + 's'
 
     id = db.Column(db.Integer, primary_key=True)
+
+    @classmethod
+    @annotate(type='Int -> b -> Either Model b')
+    def either(cls, id, error):
+        model = cls.query.get(id)
+        return Right(model) if model else Left(error)
+
+    @classmethod
+    @annotate(type='forall a. {String: a} -> Either Model String')
+    def get_one_by(cls, filters):
+        try:
+            return Right(cls.query.filter_by(**filters).one())
+        except NoResultFound:
+            return Left('{} not found with {!r}'.format(cls.__name__, filters))
+        except MultipleResultsFound:
+            return Left('multiple {} found with {!r}'.format(cls.__name__,
+                                                             filters))
+
+
+class Artist(db.Model, BaseModel, UniqueMixin):
+    repr_fields = ('name',)
+
     name = db.Column(db.Unicode(64), unique=True)
-    tags = association_proxy('_tags', 'tag', creator=lambda t:
-                             ArtistTag(tag=Tag(name=t)))
+    tags = association_proxy('_tags', 'tag',
+                             creator=lambda tag: ArtistTag(tag=tag))
+
+    def __init__(self, name, tags=None):
+        self.name = name
+        if tags:
+            self.tags.extend(tags)
 
     @classmethod
     def unique_hash(cls, name, **kwargs):
-        return name
+        return hash(name)
 
     @classmethod
     def unique_func(cls, query, name, **kwargs):
         return query.filter(cls.name == name)
 
 
-class Tag(db.Model, ReprMixin, UniqueMixin):
-    __tablename__ = 'tags'
+class Tag(db.Model, BaseModel, UniqueMixin):
     repr_fields = ('name',)
 
-    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.Unicode(16), unique=True)
-    artists = association_proxy('_artists', 'artist')
+    artists = association_proxy('_artists', 'artist',
+                                creator=lambda artist: ArtistTag(artist=artist))
+
+    def __init__(self, name, artists=None):
+        self.name = name
+        if artists:
+            self.artists.extend(artists)
 
     @classmethod
     def unique_hash(cls, name, **kwargs):
-        return name
+        return hash(name)
 
     @classmethod
     def unique_func(cls, query, name, **kwargs):
         return query.filter(cls.name == name)
 
+    @classmethod
+    @annotate(type='String -> [Tag]')
+    def from_composite(cls, composite_tag):
+        """Accepts a composite tag like 'death metal' and returns a list
+        of Tag objects that are either pulled from the database or created
+        as needed.
+        """
+        broken = break_tag(composite_tag)
+        existing = List(*cls.query.filter(cls.name.in_(broken)).all())
+        new = broken.difference(existing.fmap(lambda t: t.name)).fmap(
+            lambda t: cls.find_or_create(session=db.session, name=t))
+        return existing.extend(new)
 
-class Track(db.Model, ReprMixin):
-    __tablename__ = 'tracks'
+
+class Track(db.Model, BaseModel):
     repr_fields = ('name', 'artist')
 
-    id = db.Column(db.Integer, primary_key=True)
     artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
     artist = db.relationship('Artist')
     length = db.Column(db.Integer)
@@ -70,14 +118,12 @@ class Track(db.Model, ReprMixin):
     name = db.Column(db.UnicodeText)
     _tracklists = db.relationship('TrackPosition', backref='track')
     tracklists = association_proxy('_tracklists', 'tracklist')
-    uuid = db.Column(db.String(36), unique=True, default=uuid4().__str__)
+    uuid = db.Column(db.String(36), unique=True, default=lambda: str(uuid4()))
 
 
-class Tracklist(db.Model, ReprMixin):
-    __tablename__ = 'tracklists'
+class Tracklist(db.Model, BaseModel):
     repr_fields = ('name',)
 
-    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.Unicode(128))
     _tracks = db.relationship('TrackPosition', backref='tracklist',
                               order_by='TrackPosition.position',
@@ -100,22 +146,19 @@ class Tracklist(db.Model, ReprMixin):
         return len(self.tracks)
 
 
-class ArtistTag(db.Model, ReprMixin):
-    __tablename__ = 'artisttags'
+class ArtistTag(db.Model, BaseModel):
     repr_fields = ('tag', 'artist')
 
-    id = db.Column(db.Integer, primary_key=True)
     artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
     artist = db.relationship('Artist', backref='_tags')
     tag_id = db.Column(db.Integer, db.ForeignKey('tags.id'))
-    tag = db.relationship('Tag', backref='_artists')
+    tag = db.relationship('Tag',
+                          backref=db.backref('_artists', lazy='dynamic'))
 
 
-class TrackPosition(db.Model, ReprMixin):
-    __tablename__ = 'trackpositions'
+class TrackPosition(db.Model, BaseModel):
     repr_fields = ('tracklist', 'track', 'position')
 
-    id = db.Column(db.Integer, primary_key=True)
     position = db.Column(db.Integer)
     track_id = db.Column(db.Integer, db.ForeignKey('tracks.id'))
     tracklist_id = db.Column(db.Integer, db.ForeignKey('tracklists.id'))

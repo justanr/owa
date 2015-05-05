@@ -7,7 +7,7 @@ from flask import Flask
 
 
 def create_app(import_name, config=None, bps=None, exts=None,
-               maker=Flask, **options):
+               maker=Flask, after=None, **options):
     """Factory function for creating Flask or Flask-like objects.
 
     :param import_name: The same as the first parameter to the Flask class,
@@ -32,5 +32,8 @@ def create_app(import_name, config=None, bps=None, exts=None,
     if exts:
         for ext in exts:
             ext.init_app(application)
+
+    if after:
+        application.after_request(after)
 
     return application
