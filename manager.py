@@ -34,7 +34,7 @@ manager.add_command('db', MigrateCommand)
 def _shell_context():
     return dict(app=app, db=db, models=models,
                 utils=utils, core=core, pynads=pynads,
-                schemas=schemas, shell=shell)
+                schemas=schemas, shell=shell, api=api)
 
 if __name__ == '__main__':
     manager.run()

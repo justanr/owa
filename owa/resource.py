@@ -1,9 +1,12 @@
 from flask import request, jsonify
 from flask.ext.restful import Resource
 from inspect import isclass
+from pynads import Left, Right
 from werkzeug.wrappers import Response as ResponseBase
 from .compat import filter
 from .schemas import ErrorSchema, BaseSchema
+from .shell import get_paginated
+from .utils import get_page_and_limit
 
 
 class OWAResource(Resource):
@@ -53,6 +56,23 @@ class OWAResource(Resource):
         data = (resp.fmap(schema.dump)
                 .get_or_call(ErrorSchema().dump, resp)).data
         return jsonify(data)
+
+
+class SingleResource(OWAResource):
+    model = None
+
+    def get(self, **filters):
+        model = Right(self.model) if self.model else Left('no model')
+        return model.bind(lambda m: m.query.get_one_by(**filters))
+
+
+class ListResource(OWAResource):
+    model = None
+
+    def get(self):
+        model = Right(self.model) if self.model else Left('no model')
+        page, limit = get_page_and_limit()
+        return model.bind(lambda m: get_paginated(m, page, limit))
 
 
 def register_all_resources(module, api):

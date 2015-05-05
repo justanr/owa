@@ -8,7 +8,7 @@ from .models import Artist, Tag, ArtistTag, db
 
 @annotate(type='Request -> Int -> Either Artist String')
 def apply_tags_to_artist(request, id):
-    artist = Artist.get_one_by({'id': id})
+    artist = Artist.query.get_one_by(id=id)
     tags = process_tags_from_dict(request.get_json(),
                                   processor=partial(map, Tag.from_composite),
                                   error={'error': 'no tags found'})
@@ -34,7 +34,7 @@ def get_paginated(model, page, limit, order_by=None):
 
 @annotate(type='String -> Int -> Int -> [Artist]')
 def get_artists_by_tag(name, page, limit):
-    return (Tag.get_one_by({'name': name})
+    return (Tag.query.get_one_by(name=name)
             .fmap(attrgetter('_artists'))
             .fmap(lambda q: q.join(Artist, Artist.id == ArtistTag.artist_id))
             .fmap(lambda q: q.with_entities(Artist))

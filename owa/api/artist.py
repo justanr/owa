@@ -1,21 +1,14 @@
 from flask import request
-from operator import attrgetter
 from ..models import Artist
-from ..resource import OWAResource
+from ..resource import SingleResource, ListResource
 from ..schemas import ArtistSchema, TagSchema
-from ..shell import (apply_tags_to_artist,
-                     get_paginated)
-from ..utils import get_page_and_limit
+from ..shell import apply_tags_to_artist
 
 
-class SingleArtist(OWAResource):
+class SingleArtist(SingleResource):
     schema = ArtistSchema()
     routes = ('/artist/<int:id>/',)
-
-    def get(self, id):
-        """Returns a single artist or error message.
-        """
-        return Artist.either(id, 'no artist found')
+    model = Artist
 
     def post(self, id):
         """Allows applying multiple tags to an artist.
@@ -35,18 +28,7 @@ class SingleArtist(OWAResource):
                 TagSchema(many=True, only=('id', 'name')))
 
 
-class ListArtists(OWAResource):
+class ListArtists(ListResource):
     schema = ArtistSchema(many=True, only=('id', 'name'))
     routes = ('/', '/artist/', '/artists')
-
-    def get(self):
-        page, limit = get_page_and_limit(request)
-        return get_paginated(Artist, page, limit)
-
-
-class ListArtistTags(SingleArtist):
-    schema = TagSchema(many=True, exclude=('artists',))
-    routes = ('/artist/<int:id>/tags/',)
-
-    def get(self, id):
-        return Artist.either(id, 'no artist found').fmap(attrgetter('tags'))
+    model = Artist

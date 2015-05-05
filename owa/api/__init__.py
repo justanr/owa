@@ -1,8 +1,9 @@
 from flask.ext.restful import Api
 from ..resource import register_all_resources
-from . import artist, tag
+from . import artist, tag, track, tracklist
 
 api = Api()
 
-register_all_resources(artist, api)
-register_all_resources(tag, api)
+
+for module in (artist, tag, track, tracklist):
+    register_all_resources(module, api)

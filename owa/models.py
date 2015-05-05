@@ -13,47 +13,52 @@
     - ArtistTag
     - TrackPosition
 """
+from flask.ext.sqlalchemy import SQLAlchemy, BaseQuery
 from uuid import uuid4
-from flask.ext.sqlalchemy import SQLAlchemy
 from pynads import List, Right, Left
 from pynads.utils.decorators import annotate
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.orderinglist import ordering_list
-from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from .utils import ReprMixin, UniqueMixin
 from .core import break_tag
+
 
 db = SQLAlchemy()
 
 
+# Really wish Flask-SQLA made it easier to replace the BaseQuery class.
+class SafeQuery(BaseQuery):
+    """Handles querying the database safely using pynads.Either
+    """
+    @annotate(type='Int -> b -> Either Model b')
+    def either(self, id, error):
+        model = self.get(id)
+        return Right(model) if model else Left(error)
+
+    @annotate(type='forall a. {String: a} -> Either Model String')
+    def get_one_by(self, **filters):
+        try:
+            return Right(self.filter_by(**filters).one())
+        except NoResultFound:
+            return Left('not found with {!s}'.format(filters))
+        except MultipleResultsFound:
+            return Left('multiple results found with {!s}'.format(filters))
+
+
 class BaseModel(ReprMixin):
+    query_class = SafeQuery
+
     @declared_attr
     def __tablename__(cls):
         return cls.__name__.lower() + 's'
 
     id = db.Column(db.Integer, primary_key=True)
 
-    @classmethod
-    @annotate(type='Int -> b -> Either Model b')
-    def either(cls, id, error):
-        model = cls.query.get(id)
-        return Right(model) if model else Left(error)
 
-    @classmethod
-    @annotate(type='forall a. {String: a} -> Either Model String')
-    def get_one_by(cls, filters):
-        try:
-            return Right(cls.query.filter_by(**filters).one())
-        except NoResultFound:
-            return Left('{} not found with {!r}'.format(cls.__name__, filters))
-        except MultipleResultsFound:
-            return Left('multiple {} found with {!r}'.format(cls.__name__,
-                                                             filters))
-
-
-class Artist(db.Model, BaseModel, UniqueMixin):
+class Artist(BaseModel, db.Model, UniqueMixin):
     repr_fields = ('name',)
 
     name = db.Column(db.Unicode(64), unique=True)
@@ -74,7 +79,7 @@ class Artist(db.Model, BaseModel, UniqueMixin):
         return query.filter(cls.name == name)
 
 
-class Tag(db.Model, BaseModel, UniqueMixin):
+class Tag(BaseModel, db.Model, UniqueMixin):
     repr_fields = ('name',)
 
     name = db.Column(db.Unicode(16), unique=True)
@@ -108,7 +113,7 @@ class Tag(db.Model, BaseModel, UniqueMixin):
         return existing.extend(new)
 
 
-class Track(db.Model, BaseModel):
+class Track(BaseModel, db.Model):
     repr_fields = ('name', 'artist')
 
     artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
@@ -121,7 +126,7 @@ class Track(db.Model, BaseModel):
     uuid = db.Column(db.String(36), unique=True, default=lambda: str(uuid4()))
 
 
-class Tracklist(db.Model, BaseModel):
+class Tracklist(BaseModel, db.Model):
     repr_fields = ('name',)
 
     name = db.Column(db.Unicode(128))
@@ -146,7 +151,7 @@ class Tracklist(db.Model, BaseModel):
         return len(self.tracks)
 
 
-class ArtistTag(db.Model, BaseModel):
+class ArtistTag(BaseModel, db.Model):
     repr_fields = ('tag', 'artist')
 
     artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
@@ -156,7 +161,7 @@ class ArtistTag(db.Model, BaseModel):
                           backref=db.backref('_artists', lazy='dynamic'))
 
 
-class TrackPosition(db.Model, BaseModel):
+class TrackPosition(BaseModel, db.Model):
     repr_fields = ('tracklist', 'track', 'position')
 
     position = db.Column(db.Integer)

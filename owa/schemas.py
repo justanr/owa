@@ -1,5 +1,6 @@
 from marshmallow import Schema, post_dump
 from marshmallow.fields import List, Nested, String
+from flask.ext.marshmallow.fields import AbsoluteUrlFor as URL, Hyperlinks
 from .utils import Length
 
 # sane defaults
@@ -30,20 +31,36 @@ class ErrorSchema(Schema):
 
 class ArtistSchema(BaseSchema):
     # tags = List(String)
-    tags = List(Nested('TagSchema', only=common))
+    tags = List(Nested('TagSchema', only=('id', 'name', 'links')))
+    links = Hyperlinks({
+        'self': URL('singleartist', id='<id>'),
+        'collection': URL('listartists')
+    })
 
 
 class TagSchema(BaseSchema):
     # artists = List(String)
-    artists = List(Nested('ArtistSchema', only=common))
+    artists = List(Nested('ArtistSchema', only=('id', 'name', 'links')))
+    links = Hyperlinks({
+        'self': URL('singletag', name='<name>'),
+        'collection': URL('listtags')
+    })
 
 
 class TrackSchema(BaseSchema):
-    artist = Nested('ArtistSchema', only=common)
-    tracklists = List(Nested('TracklistSchema', only=common))
+    artist = Nested('ArtistSchema', only=('id', 'name', 'links'))
+    tracklists = List(Nested('TracklistSchema', only=('id', 'name', 'links')))
     length = Length()
     uuid = String()
+    links = Hyperlinks({
+        'self': URL('singletrack', id='<id>'),
+        'collection': URL('listtracks')
+    })
 
 
 class TracklistSchema(BaseSchema):
-    tracks = List(Nested('TrackSchema', only=common))
+    tracks = List(Nested('TrackSchema', only=('id', 'name', 'artist', 'links')))
+    links = Hyperlinks({
+        'self': URL('singletracklist', id='<id>'),
+        'collection': URL('listtracklists')
+    })

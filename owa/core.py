@@ -1,4 +1,5 @@
 import re
+from functools import partial
 from operator import attrgetter
 from pynads import List, Maybe
 from pynads.utils.decorators import annotate
@@ -41,13 +42,23 @@ def process_tags_from_dict(dct, processor, error):
             ).to_either(error)
 
 
+@annotate(type='{k: [(Int, Int)]} -> ((Int, Int) -> (Either Track b, Int)) -> '
+          'b -> Either [(Either Track b, Int)] b')
+def process_track_pos_pairs_from_dict(dct, processor, error):
+    return (process_from_dict(dct, look_for='tracks', processor=processor)
+            .fmap(lambda l: List(*l))
+            .fmap(lambda l: l.filter(lambda x: x[0]))
+            .bind(lambda l: Maybe(l, checker=bool))
+            ).to_either(error)
+
+
 @annotate(type="(Artist -> ([Tag] -> [Tag]) [Tag])")
-def extend_artist_tags(artist):
+def extend_artist_tags(artist, return_tags=True):
     """Callback for extending and Artist's tags.
     """
     def extender(tags):
         artist.tags.extend(tags)
-        return tags
+        return tags if return_tags else artist
     return extender
 
 
@@ -67,7 +78,7 @@ def extract_tag_names(tags):
 
 
 @annotate(type="Either Artist b -> Either [Tag] b -> Either Artist b")
-def combine_tags(artist, tags):
+def combine_tags(artist, tags, return_tags=True):
     """Accepts an artist and a list of tag objects both wrapped in Either
     and combines the tags on the artist with the new tags, ensuring no
     duplicates existing.
@@ -76,7 +87,7 @@ def combine_tags(artist, tags):
     # should I feel bad because I don't.
 
     return (artist
-            .fmap(extend_artist_tags)
+            .fmap(partial(extend_artist_tags, return_tags=return_tags))
             .apply(artist
                    .fmap(remove_duplicate_tags)
                    .apply(tags)
