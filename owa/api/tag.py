@@ -11,5 +11,5 @@ class SingleTag(SingleResource):
 
 class ListTags(ListResource):
     schema = TagSchema(many=True, only=('id', 'name'))
-    routes = ('/tag/', '/tags')
+    routes = ('/tag/',)
     model = Tag

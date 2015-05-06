@@ -1,17 +1,17 @@
 from flask import request
-from ..models import Playlist
+from ..models import Playlist, db
 from ..resource import SingleResource, ListResource
-from ..schemas import TracklistSchema, TrackSchema
+from ..schemas import PlaylistSchema, TrackSchema
 from ..shell import extend_tracklist, new_playlist
 
 
-class SingleTracklist(SingleResource):
-    schema = TracklistSchema()
-    routes = ('/tracklist/<int:id>/',)
+class SinglePlaylist(SingleResource):
+    schema = PlaylistSchema()
+    routes = ('/playlist/<int:id>/',)
     model = Playlist
 
     def post(self, id):
-        result, success = extend_tracklist(request.get_json(), id)
+        result, success = extend_tracklist(request.get_json(), id, model=Playlist)
         if success:
             data = (TrackSchema(many=True, only=('id', 'links', 'name', 'artist'))
                     .dump(result)
@@ -21,16 +21,18 @@ class SingleTracklist(SingleResource):
             return result
 
 
-class ListTracklists(ListResource):
-    schema = TracklistSchema(many=True)
-    routes = ('/tracklists/', '/tracklist/')
+class ListPlaylists(ListResource):
+    schema = PlaylistSchema(many=True)
+    routes = ('/playlist/', '/tracklist/')
     model = Playlist
 
     def post(self):
         result, success = new_playlist(request.get_json())
         if success:
-            return (TracklistSchema(only=('id', 'name', 'tracks'))
+            db.session.commit()
+            return (PlaylistSchema(only=('id', 'name', 'tracks'))
                     .dump(result)
                     .data)
         else:
+            db.session.rollback()
             return result

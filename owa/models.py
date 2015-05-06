@@ -100,12 +100,12 @@ class Track(BaseModel, db.Model):
     tracklists = association_proxy('_tracklists', 'tracklist')
     uuid = db.Column(db.String(36), unique=True, default=lambda: str(uuid4()))
 
-
     def __init__(self, name, artist, length, location):
         self.name = name
         self.artist = artist
         self.length = length
         self.location = location
+
 
 class Tracklist(BaseModel, db.Model):
     repr_fields = ('name',)
@@ -174,6 +174,9 @@ class Playlist(Tracklist, UniqueMixin):
     """
     id = db.Column(db.Integer, db.ForeignKey('tracklists.id'), primary_key=True)
     name = db.Column(db.Unicode(128), unique=True)
+
+    def __init__(self, **kwargs):
+        super(Playlist, self).__init__(**kwargs)
 
     @classmethod
     def unique_hash(cls, name, **kwargs):

@@ -85,6 +85,10 @@ def shove_into_models(data):
     info['artist'] = artist
     track = Track(**info)
 
+    if track not in album.tracks:
+        album.tracks.append(track)
+
+
     db.session.add_all([artist, album, track])
     db.session.add_all(tags)
     return artist, album, track, tags

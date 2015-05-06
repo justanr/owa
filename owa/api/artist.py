@@ -39,5 +39,5 @@ class SingleArtist(SingleResource):
 
 class ListArtists(ListResource):
     schema = ArtistSchema(many=True, only=('id', 'name'))
-    routes = ('/', '/artist/', '/artists')
+    routes = ('/', '/artist/')
     model = Artist

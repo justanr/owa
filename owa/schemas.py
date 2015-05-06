@@ -1,7 +1,7 @@
 from marshmallow import Schema, post_dump
 from marshmallow.fields import List, Nested, String
 from flask.ext.marshmallow.fields import AbsoluteUrlFor as URL, Hyperlinks
-from .utils import Length
+from .utils import Length, Polymorphic
 
 # sane defaults
 common = ('name', 'id')
@@ -20,27 +20,16 @@ class BaseSchema(Schema):
             return {ns: data}
 
 
-class ErrorSchema(Schema):
-    class Meta:
-        additional = ('v',)
-
-    @post_dump(raw=True)
-    def v_to_error(self, data, many=False):
-        return {'error': data['v']}
-
-
 class ArtistSchema(BaseSchema):
-    # tags = List(String)
     tags = List(Nested('TagSchema', only=('id', 'name', 'links')))
     links = Hyperlinks({
         'self': URL('singleartist', id='<id>'),
         'collection': URL('listartists')
     })
-    albums = List(Nested('TracklistSchema', only=('id', 'name', 'links')))
+    albums = List(Nested('AlbumSchema', only=('id', 'name', 'links')))
 
 
 class TagSchema(BaseSchema):
-    # artists = List(String)
     artists = List(Nested('ArtistSchema', only=('id', 'name', 'links')))
     links = Hyperlinks({
         'self': URL('singletag', name='<name>'),
@@ -50,7 +39,11 @@ class TagSchema(BaseSchema):
 
 class TrackSchema(BaseSchema):
     artist = Nested('ArtistSchema', only=('id', 'name', 'links'))
-    tracklists = List(Nested('TracklistSchema', only=('id', 'name', 'links')))
+    tracklists = List(Polymorphic(
+        mapping={'Album': 'AlbumSchema', 'Playlist': 'PlaylistSchema'},
+        default_schema='BaseSchema',
+        nested_kwargs={'only': ('id', 'links', 'name')}
+    ))
     length = Length()
     uuid = String()
     links = Hyperlinks({
@@ -60,9 +53,18 @@ class TrackSchema(BaseSchema):
     })
 
 
-class TracklistSchema(BaseSchema):
+class PlaylistSchema(BaseSchema):
     tracks = List(Nested('TrackSchema', only=('id', 'name', 'artist', 'links')))
     links = Hyperlinks({
-        'self': URL('singletracklist', id='<id>'),
-        'collection': URL('listtracklists')
+        'self': URL('singleplaylist', id='<id>'),
+        'collection': URL('listplaylists')
+    })
+
+
+class AlbumSchema(BaseSchema):
+    artist = Nested('ArtistSchema', only=('id', 'name', 'links'))
+    tracks = List(Nested('TrackSchema', only=('id', 'name', 'links')))
+    links = Hyperlinks({
+        'self': URL('singlealbum', id='<id>'),
+        'collection': URL('listalbums')
     })

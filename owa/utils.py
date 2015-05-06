@@ -6,6 +6,7 @@
 """
 from flask import request
 from marshmallow.fields import Field
+from marshmallow.class_registry import get_class as get_schema
 
 
 def get_page_and_limit(request=request):
@@ -122,6 +123,26 @@ def _seconds_to_human(seconds, units=_time_units):
         part.insert(0, '00')
 
     return ':'.join(result)
+
+
+class Polymorphic(Field):
+    def __init__(self, mapping, default_schema, nested_kwargs=None, **kwargs):
+        self.mapping = mapping
+        self.default_schema = default_schema
+        self.nested_kwargs = nested_kwargs or {}
+        super(Polymorphic, self).__init__(**kwargs)
+
+    def _serialize(self, nested, attr, obj):
+        if nested is None:
+            return None
+
+        nested_type = nested.__class__.__name__
+        schema = self.mapping.get(nested_type, self.default_schema)
+
+        if isinstance(schema, basestring):
+            schema = get_schema(schema)
+
+        return schema(**self.nested_kwargs).dump(nested).data
 
 
 class Length(Field):

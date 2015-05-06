@@ -11,5 +11,5 @@ class SingleTrack(SingleResource):
 
 class ListTracks(ListResource):
     schema = TrackSchema(many=True, only=('id', 'name', 'artist'))
-    routes = ('/tracks/',)
+    routes = ('/track/',)
     model = Track
