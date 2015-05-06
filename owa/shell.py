@@ -22,15 +22,12 @@ def apply_tags_to_artist(json, artist):
         return error, False
 
 
-def extend_tracklist(json, id, model=Playlist):
-    tracklist = model.query.get(id)
+def extend_tracklist(json, tracklist):
     tracks = process_track_pos_pairs(json, track_builder=Track.query.get)
 
     if tracklist and tracks:
-        db.session.commit()
         return [track for track, _ in insert_tracks(tracklist, tracks)], True
     else:
-        db.session.rollback()
         if not tracklist:
             error = {'error': 'Tracklist not found'}
         elif not tracks:
@@ -41,7 +38,6 @@ def extend_tracklist(json, id, model=Playlist):
 
 
 def new_playlist(json):
-    json = json
     if not json or 'name' not in json:
         return {'error': 'json not submitted or malformed'}, False
 
@@ -52,12 +48,11 @@ def new_playlist(json):
 
     if free_name:
         tracklist = Playlist(name=name)
+        db.session.add(tracklist)
 
         if 'tracks' in json:
-            tracks = process_track_pos_pairs(json,
-                                             track_builder=Track.query.get)
-            insert_tracks(tracklist, tracks)
-        db.session.commit()
+            extend_tracklist(json, tracklist)
+
         return tracklist, True
     else:
         return {'error': '{} already exists'.format(name)}, False

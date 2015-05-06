@@ -13,11 +13,13 @@ class SinglePlaylist(SingleResource):
     def post(self, id):
         result, success = extend_tracklist(request.get_json(), id, model=Playlist)
         if success:
+            db.session.commit()
             data = (TrackSchema(many=True, only=('id', 'links', 'name', 'artist'))
                     .dump(result)
                     .data)
             return data
         else:
+            db.session.rollback()
             return result
 
 
