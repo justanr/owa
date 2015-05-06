@@ -36,6 +36,7 @@ class ArtistSchema(BaseSchema):
         'self': URL('singleartist', id='<id>'),
         'collection': URL('listartists')
     })
+    albums = List(Nested('TracklistSchema', only=('id', 'name', 'links')))
 
 
 class TagSchema(BaseSchema):

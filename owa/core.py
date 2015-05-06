@@ -2,7 +2,8 @@ import re
 from functools import partial
 from itertools import chain
 
-TAG_BREAKERS = re.compile('|'.join(('\\\\', '/', '&', ',', ' ',  '\\\.')))
+_breaker_puncs = ('\\\\', '/', '&', ',', ' ', '\.', '_', '-')
+TAG_BREAKER = re.compile('|'.join(_breaker_puncs))
 
 
 def break_tag(tag):
@@ -12,10 +13,10 @@ def break_tag(tag):
 
     :param tag: A string representing a tag.
     """
-    return set(t.strip() for t in re.split(TAG_BREAKERS, tag) if t)
+    return set(t.strip() for t in re.split(TAG_BREAKER, tag.lower()) if t)
 
 
-def process_from_dict(dct, look_for, processor, or_=[]):
+def process_from_dict(dct, look_for, processor, or_=()):
     """Accepts a potentially empty mapping and attempts to process a certain
     key.
 
@@ -31,14 +32,15 @@ def process_from_dict(dct, look_for, processor, or_=[]):
 
 
 def process_tags(dct, processor):
-    data = process_from_dict(dct, look_for='tags', processor=processor)
+    data = process_from_dict(dct, look_for='tags', processor=processor, or_=[])
     return set(chain.from_iterable(data))
 
 
 def process_track_pos_pairs(dct, track_builder):
     data = process_from_dict(dct, look_for='tracks',
                              processor=partial(build_track_positions,
-                                               track_builder=track_builder))
+                                               track_builder=track_builder),
+                             or_=[])
     return [(track, pos) for track, pos in data if track]
 
 

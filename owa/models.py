@@ -37,7 +37,7 @@ class BaseModel(ReprMixin):
 class Artist(BaseModel, db.Model, UniqueMixin):
     repr_fields = ('name',)
 
-    name = db.Column(db.Unicode(64), unique=True)
+    name = db.Column(db.UnicodeText, unique=True)
     tags = association_proxy('_tags', 'tag',
                              creator=lambda tag: ArtistTag(tag=tag))
 
@@ -101,10 +101,16 @@ class Track(BaseModel, db.Model):
     uuid = db.Column(db.String(36), unique=True, default=lambda: str(uuid4()))
 
 
+    def __init__(self, name, artist, length, location):
+        self.name = name
+        self.artist = artist
+        self.length = length
+        self.location = location
+
 class Tracklist(BaseModel, db.Model):
     repr_fields = ('name',)
 
-    name = db.Column(db.Unicode(128))
+    type = db.Column(db.String(16))
     _tracks = db.relationship('TrackPosition', backref='tracklist',
                               order_by='TrackPosition.position',
                               collection_class=ordering_list('position'))
@@ -125,6 +131,63 @@ class Tracklist(BaseModel, db.Model):
     def total_tracks(self):
         return len(self.tracks)
 
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'with_polymorphic': '*'
+    }
+
+
+class Album(Tracklist, UniqueMixin):
+    """System defined tracklist
+    """
+    repr_fields = ('name', 'artist')
+
+    id = db.Column(db.Integer, db.ForeignKey('tracklists.id'), primary_key=True)
+    name = db.Column(db.Unicode(128))
+    artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
+    artist = db.relationship('Artist', backref='albums')
+
+    def __init__(self, artist, **kwargs):
+        self.artist = artist
+        super(Album, self).__init__(**kwargs)
+
+    @classmethod
+    def unique_hash(cls, name, artist, **kwargs):
+        return hash((name, artist.name))
+
+    @classmethod
+    def unique_func(cls, query, name, artist, **kwargs):
+        return query.filter(cls.name == name, cls.artist_id == artist.id)
+
+    __table_args__ = (
+        db.Constraint('name', 'artist_id'),
+    )
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'album',
+        'inherit_condition': (id == Tracklist.id)
+    }
+
+
+class Playlist(Tracklist, UniqueMixin):
+    """User defined tracklist
+    """
+    id = db.Column(db.Integer, db.ForeignKey('tracklists.id'), primary_key=True)
+    name = db.Column(db.Unicode(128), unique=True)
+
+    @classmethod
+    def unique_hash(cls, name, **kwargs):
+        return hash(name)
+
+    @classmethod
+    def unique_func(cls, query, name, **kwargs):
+        return query.filter(cls.name == name)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'playlist',
+        'inherit_condition': (id == Tracklist.id)
+    }
+
 
 class ArtistTag(BaseModel, db.Model):
     repr_fields = ('tag', 'artist')
@@ -134,6 +197,10 @@ class ArtistTag(BaseModel, db.Model):
     tag_id = db.Column(db.Integer, db.ForeignKey('tags.id'))
     tag = db.relationship('Tag',
                           backref=db.backref('_artists', lazy='dynamic'))
+
+    __table_args__ = (
+        db.UniqueConstraint('artist_id', 'tag_id'),
+    )
 
 
 class TrackPosition(BaseModel, db.Model):

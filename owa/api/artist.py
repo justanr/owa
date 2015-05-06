@@ -1,5 +1,5 @@
 from flask import request
-from ..models import Artist
+from ..models import Artist, db
 from ..resource import SingleResource, ListResource
 from ..schemas import ArtistSchema, TagSchema
 from ..shell import apply_tags_to_artist
@@ -24,13 +24,16 @@ class SingleArtist(SingleResource):
         Would apply the tags 'progressive', 'death', 'metal', 'ambient' and
         'avant-garde' to that artist.
         """
-        result, success = apply_tags_to_artist(request, id)
+        artist = Artist.query.get(id)
+        result, success = apply_tags_to_artist(request.get_json(), artist)
 
         if success:
+            db.session.commit()
             return (TagSchema(many=True, only=('id', 'name', 'links'))
                     .dump(result)
                     .data)
         else:
+            db.session.rollback()
             return result
 
 

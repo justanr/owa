@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 from flask.ext.migrate import Migrate, MigrateCommand
 from flask.ext.script import Manager
 from owa import (
@@ -17,18 +18,29 @@ from owa import (
 )
 
 from owa.api import api
+from owa.cli import store_directory
 
 import pynads
 
 app = create_app('owa',
                  config=config.DevConfig,
                  exts=[db, api],
+                 bps=[],
                  after=after_request)
 manager = Manager(app)
 migrate = Migrate(app, db)
 
 manager.add_command('db', MigrateCommand)
 
+@manager.option('-d', '--d', dest='basedir')
+def addfiles(basedir):
+    try:
+        store_directory(basedir)
+    except (KeyboardInterrupt, EOFError):
+        db.session.rollback()
+        sys.exit(1)
+    else:
+        sys.exit(0)
 
 @manager.shell
 def _shell_context():

@@ -1,21 +1,18 @@
 from .core import (process_tags, combine_tags,
                    process_track_pos_pairs, insert_tracks)
-from .models import Artist, Tag, Track, Tracklist, db
+from .models import Tag, Track, Playlist, db
 from functools import partial
 
 
-def apply_tags_to_artist(request, id):
-    artist = Artist.query.get(id)
-    tags = process_tags(request.get_json(),
+def apply_tags_to_artist(json, artist):
+    tags = process_tags(json,
                         processor=partial(map, Tag.from_composite))
 
     if tags and artist:
         result = combine_tags(artist, tags)
-        db.session.commit()
         #      result, success
         return result, True
     else:
-        db.session.rollback()
         if not artist:
             error = {'error': 'no artist found'}
         elif not tags:
@@ -25,10 +22,9 @@ def apply_tags_to_artist(request, id):
         return error, False
 
 
-def extend_tracklist(request, id):
-    tracklist = Tracklist.query.get(id)
-    tracks = process_track_pos_pairs(request.get_json(),
-                                     track_builder=Track.query.get)
+def extend_tracklist(json, id, model=Playlist):
+    tracklist = model.query.get(id)
+    tracks = process_track_pos_pairs(json, track_builder=Track.query.get)
 
     if tracklist and tracks:
         db.session.commit()
@@ -44,18 +40,18 @@ def extend_tracklist(request, id):
         return error, False
 
 
-def new_tracklist(request):
-    json = request.get_json()
+def new_playlist(json):
+    json = json
     if not json or 'name' not in json:
         return {'error': 'json not submitted or malformed'}, False
 
     name = json['name']
 
     # sanity check
-    free_name = Tracklist.query.filter_by(name=name).first() is None
+    free_name = Playlist.query.filter_by(name=name).first() is None
 
     if free_name:
-        tracklist = Tracklist(name=name)
+        tracklist = Playlist(name=name)
 
         if 'tracks' in json:
             tracks = process_track_pos_pairs(json,
