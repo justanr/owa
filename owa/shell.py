@@ -1,42 +1,67 @@
+from .core import (process_tags, combine_tags,
+                   process_track_pos_pairs, insert_tracks)
+from .models import Artist, Tag, Track, Tracklist, db
 from functools import partial
-from operator import attrgetter
-from pynads import Right
-from pynads.utils.decorators import annotate
-from .core import process_tags_from_dict, combine_tags
-from .models import Artist, Tag, ArtistTag, db
 
 
-@annotate(type='Request -> Int -> Either Artist String')
 def apply_tags_to_artist(request, id):
-    artist = Artist.query.get_one_by(id=id)
-    tags = process_tags_from_dict(request.get_json(),
-                                  processor=partial(map, Tag.from_composite),
-                                  error={'error': 'no tags found'})
+    artist = Artist.query.get(id)
+    tags = process_tags(request.get_json(),
+                        processor=partial(map, Tag.from_composite))
 
-    result = combine_tags(artist, tags)
-
-    if result:
+    if tags and artist:
+        result = combine_tags(artist, tags)
         db.session.commit()
+        #      result, success
+        return result, True
     else:
-        # purge potentially half-constructed tags
         db.session.rollback()
-    return result
+        if not artist:
+            error = {'error': 'no artist found'}
+        elif not tags:
+            error = {'error': 'no tags found'}
+        else:
+            error = {'error': 'Internal error'}
+        return error, False
 
 
-def get_paginated(model, page, limit, order_by=None):
-    if order_by and hasattr(model, order_by):
-        order_by = getattr(model, order_by)
+def extend_tracklist(request, id):
+    tracklist = Tracklist.query.get(id)
+    tracks = process_track_pos_pairs(request.get_json(),
+                                     track_builder=Track.query.get)
+
+    if tracklist and tracks:
+        db.session.commit()
+        return [track for track, _ in insert_tracks(tracklist, tracks)], True
     else:
-        order_by = model.name
-    q = model.query.order_by(order_by).paginate(page, limit, False)
-    return Right(q.items)
+        db.session.rollback()
+        if not tracklist:
+            error = {'error': 'Tracklist not found'}
+        elif not tracks:
+            error = {'error': 'Tracks not found'}
+        else:
+            error = {'error': 'Internal error'}
+        return error, False
 
 
-@annotate(type='String -> Int -> Int -> [Artist]')
-def get_artists_by_tag(name, page, limit):
-    return (Tag.query.get_one_by(name=name)
-            .fmap(attrgetter('_artists'))
-            .fmap(lambda q: q.join(Artist, Artist.id == ArtistTag.artist_id))
-            .fmap(lambda q: q.with_entities(Artist))
-            .fmap(lambda q: q.paginate(page, limit, False))
-            .fmap(attrgetter('items')))
+def new_tracklist(request):
+    json = request.get_json()
+    if not json or 'name' not in json:
+        return {'error': 'json not submitted or malformed'}, False
+
+    name = json['name']
+
+    # sanity check
+    free_name = Tracklist.query.filter_by(name=name).first() is None
+
+    if free_name:
+        tracklist = Tracklist(name=name)
+
+        if 'tracks' in json:
+            tracks = process_track_pos_pairs(json,
+                                             track_builder=Track.query.get)
+            insert_tracks(tracklist, tracks)
+        db.session.commit()
+        return tracklist, True
+    else:
+        return {'error': '{} already exists'.format(name)}, False

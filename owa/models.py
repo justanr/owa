@@ -13,15 +13,12 @@
     - ArtistTag
     - TrackPosition
 """
-from flask.ext.sqlalchemy import SQLAlchemy, BaseQuery
+from flask.ext.sqlalchemy import SQLAlchemy
 from uuid import uuid4
-from pynads import List, Right, Left
-from pynads.utils.decorators import annotate
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.orderinglist import ordering_list
-from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from .utils import ReprMixin, UniqueMixin
 from .core import break_tag
 
@@ -29,28 +26,7 @@ from .core import break_tag
 db = SQLAlchemy()
 
 
-# Really wish Flask-SQLA made it easier to replace the BaseQuery class.
-class SafeQuery(BaseQuery):
-    """Handles querying the database safely using pynads.Either
-    """
-    @annotate(type='Int -> b -> Either Model b')
-    def either(self, id, error):
-        model = self.get(id)
-        return Right(model) if model else Left(error)
-
-    @annotate(type='forall a. {String: a} -> Either Model String')
-    def get_one_by(self, **filters):
-        try:
-            return Right(self.filter_by(**filters).one())
-        except NoResultFound:
-            return Left('not found with {!s}'.format(filters))
-        except MultipleResultsFound:
-            return Left('multiple results found with {!s}'.format(filters))
-
-
 class BaseModel(ReprMixin):
-    query_class = SafeQuery
-
     @declared_attr
     def __tablename__(cls):
         return cls.__name__.lower() + 's'
@@ -100,17 +76,16 @@ class Tag(BaseModel, db.Model, UniqueMixin):
         return query.filter(cls.name == name)
 
     @classmethod
-    @annotate(type='String -> [Tag]')
     def from_composite(cls, composite_tag):
         """Accepts a composite tag like 'death metal' and returns a list
         of Tag objects that are either pulled from the database or created
         as needed.
         """
         broken = break_tag(composite_tag)
-        existing = List(*cls.query.filter(cls.name.in_(broken)).all())
-        new = broken.difference(existing.fmap(lambda t: t.name)).fmap(
-            lambda t: cls.find_or_create(session=db.session, name=t))
-        return existing.extend(new)
+        existing = cls.query.filter(cls.name.in_(broken)).all()
+        new = [cls.find_or_create(db.session, name=t) for t in
+               (broken - {t.name for t in existing})]
+        return existing + new
 
 
 class Track(BaseModel, db.Model):

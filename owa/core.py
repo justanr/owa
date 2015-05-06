@@ -1,95 +1,79 @@
 import re
 from functools import partial
-from operator import attrgetter
-from pynads import List, Maybe
-from pynads.utils.decorators import annotate
+from itertools import chain
 
 TAG_BREAKERS = re.compile('|'.join(('\\\\', '/', '&', ',', ' ',  '\\\.')))
 
 
-@annotate(type="String -> [String]")
 def break_tag(tag):
     """Splits a composite tag (like "death metal") into individual tags
     (like "death" and "metal") based on arbitrary punctuation. The smaller
-    tags are striped of white space and placed into a set, which is transformed
-    into a pynads.List
+    tags are striped of white space and placed into a set.
 
     :param tag: A string representing a tag.
     """
-    return List(*set(t.strip() for t in re.split(TAG_BREAKERS, tag) if t))
+    return set(t.strip() for t in re.split(TAG_BREAKERS, tag) if t)
 
 
-@annotate(type="{k: v} -> a -> (v -> b) -> Maybe b")
-def process_from_dict(dct, look_for, processor):
+def process_from_dict(dct, look_for, processor, or_=[]):
     """Accepts a potentially empty mapping and attempts to process a certain
-    key monadically.
+    key.
 
     :param dct: Potentially empty mapping
     :param look_for: Key to extract from dictionary if present
     :param processor: Callback for processing contents of key
-    :returns Maybe a:
+    :returns processed item from dictionary or None:
     """
-    return (Maybe(dct, checker=bool)
-            .bind(lambda d: Maybe(d.get(look_for)))
-            .fmap(processor))
+    if dct and look_for in dct:
+        return processor(dct[look_for])
+    else:
+        return or_
 
 
-@annotate(type="{k: [v]} -> ([v] -> [Tag]) -> b -> Either [Tag] b")
-def process_tags_from_dict(dct, processor, error):
-    return (process_from_dict(dct, look_for='tags', processor=processor)
-            .fmap(lambda tags: List.mconcat(*tags))
-            .fmap(List.distinct)
-            ).to_either(error)
+def process_tags(dct, processor):
+    data = process_from_dict(dct, look_for='tags', processor=processor)
+    return set(chain.from_iterable(data))
 
 
-@annotate(type='{k: [(Int, Int)]} -> ((Int, Int) -> (Either Track b, Int)) -> '
-          'b -> Either [(Either Track b, Int)] b')
-def process_track_pos_pairs_from_dict(dct, processor, error):
-    return (process_from_dict(dct, look_for='tracks', processor=processor)
-            .fmap(lambda l: List(*l))
-            .fmap(lambda l: l.filter(lambda x: x[0]))
-            .bind(lambda l: Maybe(l, checker=bool))
-            ).to_either(error)
+def process_track_pos_pairs(dct, track_builder):
+    data = process_from_dict(dct, look_for='tracks',
+                             processor=partial(build_track_positions,
+                                               track_builder=track_builder))
+    return [(track, pos) for track, pos in data if track]
 
 
-@annotate(type="(Artist -> ([Tag] -> [Tag]) [Tag])")
-def extend_artist_tags(artist, return_tags=True):
-    """Callback for extending and Artist's tags.
-    """
-    def extender(tags):
+def build_track_positions(track_pos_pairs, track_builder):
+    for pair in track_pos_pairs:
+        if isinstance(pair, (list, tuple)):
+            try:
+                track, pos = pair
+            except ValueError:  # bad unpack
+                track, pos = pair, None
+        else:
+            track, pos = pair, None
+        yield track_builder(track), pos
+
+
+def remove_duplicate_tags(artist, tags):
+    if artist:
+        return set(tags) - set(artist.tags)
+    else:
+        return set()
+
+
+def combine_tags(artist, tags, return_tags=True):
+    if artist:
+        tags = remove_duplicate_tags(artist, tags)
         artist.tags.extend(tags)
         return tags if return_tags else artist
-    return extender
+    else:
+        return None
 
 
-@annotate(type="(Artist -> ([Tag] -> [Tag]) -> [Tag]")
-def remove_duplicate_tags(artist):
-    """Callback for filter tags that exist on artist from a list of
-    new tags.
-    """
-    def remover(new_tags):
-        return List.difference(new_tags, artist.tags)
-    return remover
-
-
-@annotate(type="[Tag] -> [String]")
-def extract_tag_names(tags):
-    return List.fmap(tags, attrgetter('name'))
-
-
-@annotate(type="Either Artist b -> Either [Tag] b -> Either Artist b")
-def combine_tags(artist, tags, return_tags=True):
-    """Accepts an artist and a list of tag objects both wrapped in Either
-    and combines the tags on the artist with the new tags, ensuring no
-    duplicates existing.
-    """
-    # looks like Python and Lisp's bastard child
-    # should I feel bad because I don't.
-
-    return (artist
-            .fmap(partial(extend_artist_tags, return_tags=return_tags))
-            .apply(artist
-                   .fmap(remove_duplicate_tags)
-                   .apply(tags)
-                   )
-            )
+def insert_tracks(tl, track_pos_pairs):
+    for track, pos in track_pos_pairs:
+        if pos is not None:
+            tl.tracks.insert(pos, track)
+        else:
+            tl.tracks.append(track)
+    return track_pos_pairs

@@ -24,8 +24,14 @@ class SingleArtist(SingleResource):
         Would apply the tags 'progressive', 'death', 'metal', 'ambient' and
         'avant-garde' to that artist.
         """
-        return (apply_tags_to_artist(request, id),
-                TagSchema(many=True, only=('id', 'name')))
+        result, success = apply_tags_to_artist(request, id)
+
+        if success:
+            return (TagSchema(many=True, only=('id', 'name', 'links'))
+                    .dump(result)
+                    .data)
+        else:
+            return result
 
 
 class ListArtists(ListResource):

@@ -1,16 +1,11 @@
-from flask import request, jsonify
 from flask.ext.restful import Resource
 from inspect import isclass
-from pynads import Left, Right
-from werkzeug.wrappers import Response as ResponseBase
 from .compat import filter
-from .schemas import ErrorSchema, BaseSchema
-from .shell import get_paginated
+from .schemas import BaseSchema
 from .utils import get_page_and_limit
 
 
 class OWAResource(Resource):
-    schema = BaseSchema
     routes = []
     route_opts = {}
 
@@ -21,58 +16,31 @@ class OWAResource(Resource):
         """
         api.add_resource(cls, *cls.routes, **cls.route_opts)
 
-    def dispatch_request(self, *args, **kwargs):
-        """OWA only deals with JSON and uses Marshmallow to do so.
-        Instead of adding jsonsify(cls.scheme(data, **cls.schema_opts).data)
-        to every route by hand, the behavior is simply encoded here.
-        """
-        # Taken from Flask and Flask-Restful
-        meth = getattr(self, request.method.lower(), None)
-        if meth is None and request.method == 'HEAD':
-            meth = getattr(self, 'get', None)
-        assert meth is not None, \
-            'Unimplemented method {!r}'.format(request.method)
-
-        for decorator in self.method_decorators:
-            meth = decorator(meth)
-
-        # Convention is to return one of:
-        # * Fully realized response
-        # * Right(object)
-        # * Left(error)
-        # optionally a serializer can be returned with
-        # the Right/Left option
-
-        schema = self.schema
-
-        resp = meth(*args, **kwargs)
-
-        if isinstance(resp, tuple):
-            resp, schema = resp
-
-        if isinstance(resp, ResponseBase):
-            return resp
-
-        data = (resp.fmap(schema.dump)
-                .get_or_call(ErrorSchema().dump, resp)).data
-        return jsonify(data)
-
 
 class SingleResource(OWAResource):
+    schema = BaseSchema()
     model = None
 
     def get(self, **filters):
-        model = Right(self.model) if self.model else Left('no model')
-        return model.bind(lambda m: m.query.get_one_by(**filters))
+        if self.model:
+            item = self.model.query.filter_by(**filters).first()
+            if item:
+                return self.schema.dump(item).data
+            return {'error': 'no results found'}
+        return {'error': 'no model found'}
 
 
 class ListResource(OWAResource):
+    schema = BaseSchema(many=True)
     model = None
 
     def get(self):
-        model = Right(self.model) if self.model else Left('no model')
-        page, limit = get_page_and_limit()
-        return model.bind(lambda m: get_paginated(m, page, limit))
+        if self.model:
+            page, limit = get_page_and_limit()
+            items = self.model.query.paginate(page, limit, error_out=False).items
+            return self.schema.dump(items).data
+        else:
+            return {'error': 'no model found'}
 
 
 def register_all_resources(module, api):

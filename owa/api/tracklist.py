@@ -1,6 +1,8 @@
+from flask import request
 from ..models import Tracklist
 from ..resource import SingleResource, ListResource
-from ..schemas import TracklistSchema
+from ..schemas import TracklistSchema, TrackSchema
+from ..shell import extend_tracklist, new_tracklist
 
 
 class SingleTracklist(SingleResource):
@@ -9,11 +11,15 @@ class SingleTracklist(SingleResource):
     model = Tracklist
 
     def post(self, id):
-        # if tracklist is album: Left('Can not modify album.')
-        # parse json looking for
-        # track, position pairs
-        # insert tracks at desired spots
-        pass
+        result, success = extend_tracklist(request, id)
+        if success:
+            data = (TrackSchema(many=True, only=('id', 'links', 'name', 'artist'))
+                    .dump(result)
+                    .data)
+            return data
+        else:
+            return result
+
 
 class ListTracklists(ListResource):
     schema = TracklistSchema(many=True)
@@ -21,8 +27,10 @@ class ListTracklists(ListResource):
     model = Tracklist
 
     def post(self):
-        # parse json to
-        #   - tracklist name
-        #   - any possible tracks
-        # create tracklist
-        pass
+        result, success = new_tracklist(request)
+        if success:
+            return (TracklistSchema(only=('id', 'name', 'tracks'))
+                    .dump(result)
+                    .data)
+        else:
+            return result

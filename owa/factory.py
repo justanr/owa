@@ -27,7 +27,7 @@ def create_app(import_name, config=None, bps=None, exts=None,
 
     if bps:
         for bp in bps:
-            application.register(bp)
+            application.register_blueprint(bp)
 
     if exts:
         for ext in exts:
