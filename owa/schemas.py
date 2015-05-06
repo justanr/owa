@@ -55,7 +55,8 @@ class TrackSchema(BaseSchema):
     uuid = String()
     links = Hyperlinks({
         'self': URL('singletrack', id='<id>'),
-        'collection': URL('listtracks')
+        'collection': URL('listtracks'),
+        'stream': URL('stream.stream', stream='<uuid>')
     })
 
 

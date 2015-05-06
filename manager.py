@@ -18,6 +18,7 @@ from owa import (
 )
 
 from owa.api import api
+from owa.stream import Stream
 from owa.cli import store_directory
 
 import pynads
@@ -25,12 +26,13 @@ import pynads
 app = create_app('owa',
                  config=config.DevConfig,
                  exts=[db, api],
-                 bps=[],
+                 bps=[Stream],
                  after=after_request)
 manager = Manager(app)
 migrate = Migrate(app, db)
 
 manager.add_command('db', MigrateCommand)
+
 
 @manager.option('-d', '--d', dest='basedir')
 def addfiles(basedir):
@@ -41,6 +43,7 @@ def addfiles(basedir):
         sys.exit(1)
     else:
         sys.exit(0)
+
 
 @manager.shell
 def _shell_context():
