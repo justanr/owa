@@ -6,6 +6,7 @@
 from collections import Mapping
 from functools import partial
 from marshmallow import Schema
+from marshmallow.base import SchemaABC
 from marshmallow.fields import Field
 from marshmallow.class_registry import get_class as get_schema
 from marshmallow.compat import basestring
@@ -97,8 +98,8 @@ class Polymorphic(Field):
 
     Modified from example by `Steven Loria <https://github.com/marshmallow-code/marshmallow/issues/42#issuecomment-54719736>`
     """
-    def __init__(self, mapping, default_schema, nested_kwargs=None, **kwargs):
-        self.mapping = mapping
+    def __init__(self, schemas, default_schema, nested_kwargs=None, **kwargs):
+        self.schemas = schemas
         self.default_schema = default_schema
         self.nested_kwargs = nested_kwargs or {}
         super(Polymorphic, self).__init__(**kwargs)
@@ -108,12 +109,27 @@ class Polymorphic(Field):
             return None
 
         nested_type = nested.__class__.__name__
-        schema = self.mapping.get(nested_type, self.default_schema)
+        schema = self.schemas.get(nested_type, self.default_schema)
 
         if isinstance(schema, basestring):
-            schema = get_schema(schema)
+            schema = get_schema(schema)(**self.nested_kwargs)
+            self.schemas[nested_type] = schema
 
-        return schema(**self.nested_kwargs).dump(nested).data
+        # already a schema instance
+        # here for completion's sake though
+        elif isinstance(schema, SchemaABC):
+            pass
+
+        elif isinstance(schema, type) and issubclass(schema, SchemaABC):
+            schema = schema(**self.nested_kwargs)
+            self.schemas[nested_type] = schema
+
+        else:
+            raise ValueError("Nested fields must be passed a Schema, not {0}"
+                             .format(schema.__class__.__name__))
+
+        # allow errors to propagate from dump
+        return schema.dump(nested).data
 
 
 class Length(Field):
