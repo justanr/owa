@@ -5,6 +5,7 @@
 """
 from collections import Mapping
 from functools import partial
+from flask_restful import unpack
 from marshmallow import Schema
 from marshmallow.base import SchemaABC
 from marshmallow.fields import Field
@@ -20,7 +21,6 @@ _time_units = (
     60,     # 1 minute
     1,      # 1 second
 )
-
 
 def marshal_with(schema, **kwargs):
     """A spin of Flask-Restful's marshal_with decorator to work with
@@ -43,7 +43,8 @@ def marshal_with(schema, **kwargs):
             if isinstance(res, (BaseResponse, Mapping)):
                 return res
             else:
-                return dumper(res).data
+                data, code, headers = unpack(res)
+                return dumper(data).data, code, headers
         return wrapper
     return deco
 
@@ -90,7 +91,7 @@ class Polymorphic(Field):
                                 default_schema='BaseSchema')
 
     :param mapping dict: Mapping of class names to schemas. Schemas may be given
-    as strings or actual classes.
+    as strings, classes or instances of a schema.
     :param default_schema: Default schema to fallback on if a suitable match
     isn't found.
     :param nested_kwargs dict: Keyword arguments to pass along to the nested
@@ -108,7 +109,7 @@ class Polymorphic(Field):
         if nested is None:
             return None
 
-        nested_type = nested.__class__.__name__
+        nested_type = type(nested)
         schema = self.schemas.get(nested_type, self.default_schema)
 
         if isinstance(schema, basestring):
@@ -126,7 +127,7 @@ class Polymorphic(Field):
 
         else:
             raise ValueError("Nested fields must be passed a Schema, not {0}"
-                             .format(schema.__class__.__name__))
+                             .format(type(schema)))
 
         # allow errors to propagate from dump
         return schema.dump(nested).data
