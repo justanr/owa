@@ -12,22 +12,19 @@ from owa import (
 
     # modules
     schemas, models, utils, core, shell,
-
-    # helpers
-    create_app, after_request
 )
 
 from owa.api import api
 from owa.stream import Stream
-from owa.cli import store_directory
+from owa.commands import store_directory
+from owa.utils import create_app
 
 import pynads
 
 app = create_app('owa',
                  config=config.DevConfig,
                  exts=[db, api],
-                 bps=[Stream],
-                 after=after_request)
+                 bps=[Stream])
 manager = Manager(app)
 migrate = Migrate(app, db)
 

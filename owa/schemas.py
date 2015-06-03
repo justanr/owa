@@ -40,7 +40,7 @@ class TagSchema(BaseSchema):
 class TrackSchema(BaseSchema):
     artist = Nested('ArtistSchema', only=('id', 'name', 'links'))
     tracklists = List(Polymorphic(
-        mapping={'Album': 'AlbumSchema', 'Playlist': 'PlaylistSchema'},
+        schemas={'Album': 'AlbumSchema', 'Playlist': 'PlaylistSchema'},
         default_schema='BaseSchema',
         nested_kwargs={'only': ('id', 'links', 'name')}
     ))

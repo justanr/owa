@@ -1,15 +1,13 @@
-from .core import (process_tags, combine_tags,
-                   process_track_pos_pairs, insert_tracks)
+from .core import gather_tags, combine_tags, gather_tracks
 from .models import Tag, Track, Playlist, db
 from functools import partial
 
 
 def apply_tags_to_artist(json, artist):
-    tags = process_tags(json,
-                        processor=partial(map, Tag.from_composite))
+    tags = gather_tags(json, processor=partial(map, Tag.from_composite))
 
     if tags and artist:
-        result = combine_tags(artist, tags)
+        _, result = combine_tags(artist, tags)
         #      result, success
         return result, True
     else:
@@ -23,10 +21,11 @@ def apply_tags_to_artist(json, artist):
 
 
 def extend_tracklist(json, tracklist):
-    tracks = process_track_pos_pairs(json, track_builder=Track.query.get)
+    tracks = gather_tracks(json, track_builder=partial(map, Track.query.get))
 
     if tracklist and tracks:
-        return [track for track, _ in insert_tracks(tracklist, tracks)], True
+        tracklist.tracks.extend(tracks)
+        return tracks, True
     else:
         if not tracklist:
             error = {'error': 'Tracklist not found'}

@@ -11,5 +11,5 @@ class SingleAlbum(SingleResource):
 
 class ListAlbums(ListResource):
     schema = AlbumSchema(many=True)
-    routes = ('/album/', '/tracklist/')
+    routes = ('/album/',)
     model = Album

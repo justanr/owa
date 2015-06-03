@@ -3,6 +3,7 @@ from ..models import Playlist, db
 from ..resource import SingleResource, ListResource
 from ..schemas import PlaylistSchema, TrackSchema
 from ..shell import extend_tracklist, new_playlist
+from ..utils import marshal_with
 
 
 class SinglePlaylist(SingleResource):
@@ -10,14 +11,17 @@ class SinglePlaylist(SingleResource):
     routes = ('/playlist/<int:id>/',)
     model = Playlist
 
+    @marshal_with(PlaylistSchema)
+    def get(self, id):
+        pl = Playlist.query.get(id)
+        return pl or {'error': 'playlist not found'}
+
+    @marshal_with(TrackSchema, many=True, only=('id', 'links', 'name', 'artist')) # noqa
     def post(self, id):
-        result, success = extend_tracklist(request.get_json(), id, model=Playlist)
+        playlist = Playlist.query.get(id)
+        result, success = extend_tracklist(request.get_json(), playlist)
         if success:
             db.session.commit()
-            data = (TrackSchema(many=True, only=('id', 'links', 'name', 'artist'))
-                    .dump(result)
-                    .data)
-            return data
         else:
             db.session.rollback()
             return result

@@ -1,5 +1,4 @@
 import re
-from functools import partial
 from itertools import chain
 
 _breaker_puncs = ('\\\\', '/', '&', ',', ' ', '\.', '_', '-')
@@ -31,51 +30,30 @@ def process_from_dict(dct, look_for, processor, or_=()):
         return or_
 
 
-def process_tags(dct, processor):
+def gather_tags(dct, processor):
     data = process_from_dict(dct, look_for='tags', processor=processor, or_=[])
     return set(chain.from_iterable(data))
 
 
-def process_track_pos_pairs(dct, track_builder):
+def gather_tracks(dct, track_builder):
     data = process_from_dict(dct, look_for='tracks',
-                             processor=partial(build_track_positions,
-                                               track_builder=track_builder),
-                             or_=[])
-    return [(track, pos) for track, pos in data if track]
-
-
-def build_track_positions(track_pos_pairs, track_builder):
-    for pair in track_pos_pairs:
-        if isinstance(pair, (list, tuple)):
-            try:
-                track, pos = pair
-            except ValueError:  # bad unpack
-                track, pos = pair, None
-        else:
-            track, pos = pair, None
-        yield track_builder(track), pos
+                             processor=track_builder, or_=[])
+    return [track for track in data if track]
 
 
 def remove_duplicate_tags(artist, tags):
     if artist:
         return set(tags) - set(artist.tags)
-    else:
-        return set()
+    return set()
 
 
-def combine_tags(artist, tags, return_tags=True):
-    if artist:
-        tags = remove_duplicate_tags(artist, tags)
-        artist.tags.extend(tags)
-        return tags if return_tags else artist
-    else:
-        return None
+def combine_tags(artist, tags):
+    tags = remove_duplicate_tags(artist, tags)
+    artist.tags.extend(tags)
+    return artist, tags
 
 
-def insert_tracks(tl, track_pos_pairs):
-    for track, pos in track_pos_pairs:
-        if pos is not None:
-            tl.tracks.insert(pos, track)
-        else:
-            tl.tracks.append(track)
-    return track_pos_pairs
+def reorder_tracklist(tracks, new_order):
+    return [tracks[n] for n in new_order]
+
+
