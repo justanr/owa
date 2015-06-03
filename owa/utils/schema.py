@@ -81,7 +81,7 @@ def _seconds_to_human(seconds, units=_time_units):
             break
 
     if len(result) < 2:
-        part.insert(0, '00')
+        result.insert(0, '00')
 
     return ':'.join(result)
 
