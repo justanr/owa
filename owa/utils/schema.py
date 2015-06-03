@@ -22,6 +22,7 @@ _time_units = (
     1,      # 1 second
 )
 
+
 def marshal_with(schema, **kwargs):
     """A spin of Flask-Restful's marshal_with decorator to work with
     Marshmallow serializers.
@@ -37,14 +38,22 @@ def marshal_with(schema, **kwargs):
     def deco(fn):
         def wrapper(*args, **kwargs):
             res = fn(*args, **kwargs)
+
             # result is a fully realized response
-            # or a mapping already
             # pass it through
-            if isinstance(res, (BaseResponse, Mapping)):
+            if isinstance(res, BaseResponse):
                 return res
-            else:
-                data, code, headers = unpack(res)
-                return dumper(data).data, code, headers
+
+            data, code, headers = unpack(res)
+
+            # if a mapping is handed back, it's
+            # been serialized already so we don't bother
+            # trying to re-serialize it
+            if not isinstance(data, Mapping):
+                data = dumper(data).data
+
+            return data, code, headers
+
         return wrapper
     return deco
 
