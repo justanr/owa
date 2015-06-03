@@ -16,7 +16,7 @@ from owa import (
 
 from owa.api import api
 from owa.stream import Stream
-from owa.commands import store_directory
+from owa import cli
 from owa.utils import create_app
 
 import pynads
@@ -33,8 +33,9 @@ manager.add_command('db', MigrateCommand)
 
 @manager.option('-d', '--d', dest='basedir')
 def addfiles(basedir):
+    app.config['SQLALCHEMY_RECORD_QUERIES'] = False
     try:
-        store_directory(basedir)
+        cli.shell.store_directory(basedir)
     except (KeyboardInterrupt, EOFError):
         db.session.rollback()
         sys.exit(1)

@@ -14,6 +14,7 @@
     - TrackPosition
 """
 from flask.ext.sqlalchemy import SQLAlchemy
+from itertools import chain
 from uuid import uuid4
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declared_attr
@@ -54,6 +55,10 @@ class Artist(BaseModel, db.Model, UniqueMixin):
     def unique_func(cls, query, name, **kwargs):
         return query.filter(cls.name == name)
 
+    def apply_tags(self, tags):
+        tags = chain.from_iterable([Tag.from_composite(tag) for tag in tags])
+        self.tags.extend(set(tags) - set(self.tags))
+
 
 class Tag(BaseModel, db.Model, UniqueMixin):
     repr_fields = ('name',)
@@ -83,8 +88,7 @@ class Tag(BaseModel, db.Model, UniqueMixin):
         """
         broken = break_tag(composite_tag)
         existing = cls.query.filter(cls.name.in_(broken)).all()
-        new = [cls.find_or_create(db.session, name=t) for t in
-               (broken - {t.name for t in existing})]
+        new = [cls(name=t) for t in broken - {t.name for t in existing}]
         return existing + new
 
 
