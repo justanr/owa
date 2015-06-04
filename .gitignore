@@ -1,3 +1,6 @@
+# Created by https://www.gitignore.io
+
+### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -56,5 +59,15 @@ docs/_build/
 # PyBuilder
 target/
 
-# rope
-.ropeproject/
+# ropeproject
+.ropeproject
+
+
+### Vim ###
+[._]*.s[a-w][a-z]
+[._]s[a-w][a-z]
+*.un~
+Session.vim
+.netrwhist
+*~
+
