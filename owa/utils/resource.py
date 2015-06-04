@@ -1,8 +1,8 @@
 from flask.ext.restful import Resource
 from inspect import isclass
 from operator import attrgetter
-from .schemas import BaseSchema
-from .utils import get_page_and_limit, multifilter
+from ..schemas import BaseSchema
+from .general import get_page_and_limit, multifilter
 
 
 __all__ = ('OWAResource', 'SingleResource', 'ListResource',
