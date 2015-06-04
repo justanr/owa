@@ -1,5 +1,5 @@
 from ..models import Tag
-from ..resource import SingleResource, ListResource
+from . import SingleResource, ListResource
 from ..schemas import TagSchema
 
 

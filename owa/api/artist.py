@@ -1,6 +1,6 @@
 from flask import request
 from ..models import Artist, db
-from ..resource import SingleResource, ListResource
+from . import SingleResource, ListResource
 from ..schemas import ArtistSchema, TagSchema
 from ..shell import apply_tags_to_artist
 

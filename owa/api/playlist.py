@@ -1,6 +1,6 @@
 from flask import request
 from ..models import Playlist, db
-from ..resource import SingleResource, ListResource
+from . import SingleResource, ListResource
 from ..schemas import PlaylistSchema, TrackSchema
 from ..shell import extend_tracklist, new_playlist
 from ..utils import marshal_with
