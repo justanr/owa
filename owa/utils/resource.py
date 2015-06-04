@@ -1,8 +1,12 @@
 from flask.ext.restful import Resource
 from inspect import isclass
-from .compat import filter
+from operator import attrgetter
 from .schemas import BaseSchema
-from .utils import get_page_and_limit
+from .utils import get_page_and_limit, multifilter
+
+
+__all__ = ('OWAResource', 'SingleResource', 'ListResource',
+           'register_all_resources')
 
 
 class OWAResource(Resource):
@@ -44,9 +48,8 @@ class ListResource(OWAResource):
 
 
 def register_all_resources(module, api):
-    classes = filter(isclass, module.__dict__.values())
-    resources = filter(lambda x: issubclass(x, OWAResource), classes)
-    for resource in resources:
-        if resource is OWAResource:
-            continue
+    filters = [isclass, lambda r: issubclass(r, OWAResource),
+               attrgetter('routes')]
+
+    for resource in multifilter(module.__dict__.values(), *filters):
         resource.register(api)
