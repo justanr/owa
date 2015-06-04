@@ -12,15 +12,11 @@ from marshmallow.fields import Field
 from marshmallow.class_registry import get_class as get_schema
 from marshmallow.compat import basestring
 from werkzeug.wrappers import BaseResponse
+from ..compat import wraps
+from .general import seconds_to_human
 
 
 __all__ = ('Polymorphic', 'Length', 'marshal_with')
-
-_time_units = (
-    3600,   # 1 hour
-    60,     # 1 minute
-    1,      # 1 second
-)
 
 
 def marshal_with(schema, **kwargs):
@@ -36,6 +32,7 @@ def marshal_with(schema, **kwargs):
         dumper = partial(schema.dump, **kwargs)
 
     def deco(fn):
+        @wraps(fn)
         def wrapper(*args, **kwargs):
             res = fn(*args, **kwargs)
 
@@ -56,35 +53,6 @@ def marshal_with(schema, **kwargs):
 
         return wrapper
     return deco
-
-
-def _seconds_to_human(seconds, units=_time_units):
-    """Converter to transform a seconds based length into a huamn readable
-    format. Smart enough to handle edge cases like exactly one minute or
-    exactly three hours.
-
-    :param seconds: A member of numbers.Number representing length
-    :param units: Iterable of time units given in seconds
-    """
-    if not seconds:
-        return '00:00'
-
-    result = []
-
-    for idx, unit in enumerate(_time_units, 1):
-        part, seconds = seconds // unit, seconds % unit
-        if part:
-            result.append('{:0>2}'.format(part))
-        if not seconds:
-            # bail early and build the rest of the length
-            result.extend(['00'] * (len(units) - idx))
-            break
-
-    if len(result) < 2:
-        result.insert(0, '00')
-
-    return ':'.join(result)
-
 
 class Polymorphic(Field):
     """Allows polymorphic serialization of a field by nesting several potential
@@ -146,4 +114,4 @@ class Length(Field):
     """Field to serialize second based length to a human readable form.
     """
     def _serialize(self, value, attr, obj):
-        return _seconds_to_human(value)
+        return seconds_to_human(value)
