@@ -13,29 +13,19 @@
     - ArtistTag
     - TrackPosition
 """
-from flask.ext.sqlalchemy import SQLAlchemy
 from itertools import chain
-from uuid import uuid4
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.orderinglist import ordering_list
-from .utils import ReprMixin, UniqueMixin
+from uuid import uuid4
 from .core import break_tag
+from .exts import SQLAlchemy
+from .utils.model import BaseModel, UniqueMixin
+
+db = SQLAlchemy(model=BaseModel)
 
 
-db = SQLAlchemy()
-
-
-class BaseModel(ReprMixin):
-    @declared_attr
-    def __tablename__(cls):
-        return cls.__name__.lower() + 's'
-
-    id = db.Column(db.Integer, primary_key=True)
-
-
-class Artist(BaseModel, db.Model, UniqueMixin):
+class Artist(db.Model, UniqueMixin):
     repr_fields = ('name',)
 
     name = db.Column(db.UnicodeText, unique=True)
@@ -60,7 +50,7 @@ class Artist(BaseModel, db.Model, UniqueMixin):
         self.tags.extend(set(tags) - set(self.tags))
 
 
-class Tag(BaseModel, db.Model, UniqueMixin):
+class Tag(db.Model, UniqueMixin):
     repr_fields = ('name',)
 
     name = db.Column(db.Unicode(16), unique=True)
@@ -92,7 +82,7 @@ class Tag(BaseModel, db.Model, UniqueMixin):
         return existing + new
 
 
-class Track(BaseModel, db.Model):
+class Track(db.Model):
     repr_fields = ('name', 'artist')
 
     artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
@@ -111,7 +101,7 @@ class Track(BaseModel, db.Model):
         self.location = location
 
 
-class Tracklist(BaseModel, db.Model):
+class Tracklist(db.Model):
     repr_fields = ('name',)
 
     type = db.Column(db.String(16))
@@ -196,7 +186,7 @@ class Playlist(Tracklist, UniqueMixin):
     }
 
 
-class ArtistTag(BaseModel, db.Model):
+class ArtistTag(db.Model):
     repr_fields = ('tag', 'artist')
 
     artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
@@ -210,7 +200,7 @@ class ArtistTag(BaseModel, db.Model):
     )
 
 
-class TrackPosition(BaseModel, db.Model):
+class TrackPosition(db.Model):
     repr_fields = ('tracklist', 'track', 'position')
 
     position = db.Column(db.Integer)

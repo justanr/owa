@@ -3,6 +3,10 @@
     ```````````````
     Utilities and Mixins for SQLA models in OWA.
 """
+from flask_sqlalchemy import Model
+from sqlalchemy import Column, Integer
+from sqlalchemy.ext.declarative import declared_attr
+
 
 __all__ = ('UniqueMixin', 'ReprMixin')
 
@@ -80,3 +84,13 @@ class ReprMixin(object):
         return '<{} {}>'.format(
             self.__class__.__name__,
             pattern.format(**fields))
+
+
+class BaseModel(Model, ReprMixin):
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower() + 's'
+
+    @declared_attr
+    def id(cls):
+        return Column(Integer, primary_key=True)

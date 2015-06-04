@@ -1,5 +1,6 @@
-from flask.ext.restful import Api
-from ..utils.resource import register_all_resources, SingleResource, ListResource
+from ..exts import Api
+from ..utils.resource import register_all_resources
+from ..utils.resource import SingleResource, ListResource
 from . import artist, tag, track, playlist, album
 
 api = Api()
