@@ -19,8 +19,6 @@ from owa.stream import Stream
 from owa import cli
 from owa.utils import create_app
 
-import pynads
-
 app = create_app('owa',
                  config=config.DevConfig,
                  exts=[db, api],
@@ -46,7 +44,7 @@ def addfiles(basedir):
 @manager.shell
 def _shell_context():
     return dict(app=app, db=db, models=models,
-                utils=utils, core=core, pynads=pynads,
+                utils=utils, core=core,
                 schemas=schemas, shell=shell, api=api)
 
 if __name__ == '__main__':
