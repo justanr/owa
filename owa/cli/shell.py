@@ -13,7 +13,7 @@ from time import time
 from .core import (filter_files, make_full_paths, shove_into,
                    adapt_track_to_dict, valid_file_exts)
 from ..models import db, Artist, Track, Album
-from ..utils.schema import _seconds_to_human
+from ..utils import seconds_to_human
 
 
 def shove_into_models(data):
@@ -79,8 +79,8 @@ def store_directory(basedir, valid_exts=valid_file_exts,
                       file=stderr)
             else:
                 now = time()
-                local_end = _seconds_to_human(int(now - local_start))
-                global_time = _seconds_to_human(int(now - running_time))
+                local_end = seconds_to_human(int(now - local_start))
+                global_time = seconds_to_human(int(now - running_time))
                 print('\n**Stored: {0.name} - {1.name}\n'
                       '  Files: {2}\n'
                       '  Time:  {3}\n'
